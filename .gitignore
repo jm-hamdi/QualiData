@@ -1,0 +1,15 @@
+prompts/
+
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Uploads & outputs
+uploads/*
+outputs/*
+!uploads/.gitkeep
+!outputs/.gitkeep

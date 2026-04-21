@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QualiData — Data Quality Pipeline</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0e1a;
+      --surface: #111827;
+      --surface2: #1a2235;
+      --border: #1f2d45;
+      --accent: #00d4ff;
+      --green: #10b981;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ── Layout ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    /* ── Upload ── */
+    #upload-section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 2rem; }
+
+    .hero-title {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(1.6rem, 4vw, 2.6rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+    .hero-sub { color: var(--muted); font-size: 1rem; max-width: 500px; }
+
+    .drop-zone {
+      width: min(560px, 90vw);
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--surface);
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(0,212,255,0.05);
+    }
+    .drop-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .drop-text { font-size: 1.05rem; color: var(--muted); margin-bottom: 1rem; }
+    .format-tags { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+    .tag {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+    }
+
+    #file-input { display: none; }
+
+    .file-info-bar {
+      display: none;
+      align-items: center;
+      gap: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      width: min(560px, 90vw);
+      flex-wrap: wrap;
+    }
+    .file-info-bar.visible { display: flex; }
+    .file-name { font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--accent); flex: 1; }
+    .file-meta { color: var(--muted); font-size: 0.85rem; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: .4rem;
+      border: none; border-radius: 8px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 600;
+      padding: .55rem 1.2rem; transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-accent { background: var(--accent); color: #0a0e1a; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-muted { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+    /* ── Loading ── */
+    #loading { display: none; min-height: 100vh; flex-direction: column; justify-content: center; align-items: center; gap: 1.5rem; }
+    #loading.active { display: flex; }
+    .spinner {
+      width: 56px; height: 56px;
+      border: 4px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-family: 'Space Mono', monospace; color: var(--muted); letter-spacing: 1px; }
+
+    /* ── Dashboard ── */
+    #dashboard { display: none; }
+    #dashboard.active { display: block; }
+
+    .dash-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 1rem;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+    .dash-title { font-family: 'Space Mono', monospace; font-size: 1.1rem; color: var(--accent); }
+    .dash-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+
+    /* Score cards */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.4rem 1.5rem;
+    }
+    .card-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: .5rem; }
+    .card-value { font-family: 'Space Mono', monospace; font-size: 2rem; font-weight: 700; }
+    .card-value.green { color: var(--green); }
+    .card-value.orange { color: var(--orange); }
+    .card-value.red { color: var(--red); }
+    .card-value.neutral { color: var(--accent); }
+
+    /* Sections */
+    .section { margin-bottom: 2.5rem; }
+    .section-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.95rem;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* Changes log */
+    .changes-list { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
+    .changes-list li {
+      display: flex; align-items: flex-start; gap: .75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .65rem 1rem;
+      font-size: 0.9rem;
+    }
+    .changes-list li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead th {
+      background: var(--surface2);
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      padding: .75rem 1rem;
+      text-align: left;
+      white-space: nowrap;
+    }
+    tbody tr { border-top: 1px solid var(--border); }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    tbody td { padding: .65rem 1rem; color: var(--text); vertical-align: middle; }
+
+    /* Score bar */
+    .score-bar-wrap { display: flex; align-items: center; gap: .6rem; }
+    .score-bar-bg { flex: 1; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; min-width: 60px; }
+    .score-bar-fill { height: 100%; border-radius: 99px; }
+    .score-bar-fill.green { background: var(--green); }
+    .score-bar-fill.orange { background: var(--orange); }
+    .score-bar-fill.red { background: var(--red); }
+    .score-pct { font-family: 'Space Mono', monospace; font-size: 0.8rem; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<!-- STATE 1: Upload -->
+<div id="upload-section" class="container">
+  <div>
+    <h1 class="hero-title">Automated Data Quality Pipeline</h1>
+    <p class="hero-sub" style="margin-top:.75rem;">Téléversez un fichier CSV ou Excel pour détecter, scorer et nettoyer automatiquement vos données.</p>
+  </div>
+
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <div class="drop-icon">📂</div>
+    <p class="drop-text">Glissez-déposez votre fichier ici<br>ou cliquez pour parcourir</p>
+    <div class="format-tags">
+      <span class="tag">.CSV</span>
+      <span class="tag">.XLSX</span>
+      <span class="tag">.XLS</span>
+    </div>
+  </div>
+  <input type="file" id="file-input" accept=".csv,.xlsx,.xls" onchange="handleFile(this.files[0])" />
+
+  <div class="file-info-bar" id="file-info-bar">
+    <span class="file-name" id="file-name-label">—</span>
+    <span class="file-meta" id="file-meta-label">—</span>
+    <button class="btn btn-accent" onclick="runAnalysis()">▶ ANALYSER</button>
+  </div>
+</div>
+
+<!-- STATE 2: Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p class="loading-text">Analyse en cours...</p>
+</div>
+
+<!-- STATE 3: Dashboard -->
+<div id="dashboard" class="container">
+  <div class="dash-header">
+    <span class="dash-title">QualiData — Rapport de qualité</span>
+    <div class="dash-actions">
+      <button class="btn btn-green" onclick="download('excel')">⬇ Excel + Rapport</button>
+      <button class="btn btn-accent" onclick="download('csv')">⬇ CSV Nettoyé</button>
+      <button class="btn btn-muted" onclick="reset()">↩ Nouveau fichier</button>
+    </div>
+  </div>
+
+  <!-- Score cards -->
+  <div class="cards-grid">
+    <div class="card">
+      <div class="card-label">Score global avant</div>
+      <div class="card-value" id="card-score-before">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Score global après</div>
+      <div class="card-value" id="card-score-after">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Lignes traitées</div>
+      <div class="card-value neutral" id="card-rows">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Colonnes analysées</div>
+      <div class="card-value neutral" id="card-cols">—</div>
+    </div>
+  </div>
+
+  <!-- Changes log -->
+  <div class="section">
+    <div class="section-title">Transformations appliquées</div>
+    <ul class="changes-list" id="changes-list"></ul>
+  </div>
+
+  <!-- Column quality table -->
+  <div class="section">
+    <div class="section-title">Qualité par colonne</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Colonne</th>
+            <th>Type</th>
+            <th>Score avant</th>
+            <th>Score après</th>
+            <th>Manquants</th>
+            <th>Invalides</th>
+          </tr>
+        </thead>
+        <tbody id="col-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="section">
+    <div class="section-title">Aperçu données nettoyées</div>
+    <div class="table-wrap" id="preview-wrap"></div>
+  </div>
+</div>
+
+<script>
+  let sessionId = null;
+  let previewData = null;
+  let analysisResult = null;
+
+  // ── Drag & drop ──────────────────────────────────────────────────────────────
+  const dropZone = document.getElementById('drop-zone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function showSection(id) {
+    ['upload-section', 'loading', 'dashboard'].forEach(s => {
+      const el = document.getElementById(s);
+      if (s === 'loading' || s === 'dashboard') {
+        el.classList.toggle('active', s === id);
+      } else {
+        el.style.display = s === id ? '' : 'none';
+      }
+    });
+  }
+
+  function scoreColor(v) {
+    if (v >= 80) return 'green';
+    if (v >= 50) return 'orange';
+    return 'red';
+  }
+
+  function scoreBar(v) {
+    const cls = scoreColor(v);
+    return `<div class="score-bar-wrap">
+      <div class="score-bar-bg"><div class="score-bar-fill ${cls}" style="width:${v}%"></div></div>
+      <span class="score-pct" style="color:var(--${cls})">${v}%</span>
+    </div>`;
+  }
+
+  // ── STATE 1: handleFile ───────────────────────────────────────────────────────
+  async function handleFile(file) {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    if (!res.ok) { alert('Erreur lors du téléversement.'); return; }
+    const data = await res.json();
+
+    sessionId = data.session_id;
+    previewData = data;
+
+    document.getElementById('file-name-label').textContent = data.filename;
+    document.getElementById('file-meta-label').textContent = `${data.rows} lignes · ${data.columns.length} colonnes`;
+    document.getElementById('file-info-bar').classList.add('visible');
+  }
+
+  // ── STATE 2→3: runAnalysis ────────────────────────────────────────────────────
+  async function runAnalysis() {
+    if (!sessionId) return;
+    showSection('loading');
+
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    if (!res.ok) { showSection('upload-section'); alert('Erreur lors de l\'analyse.'); return; }
+    const result = await res.json();
+    analysisResult = result;
+    renderDashboard(result);
+  }
+
+  // ── renderDashboard ───────────────────────────────────────────────────────────
+  function renderDashboard(r) {
+    // Score cards
+    const sb = r.global_score_before;
+    const sa = r.global_score_after;
+    const elSb = document.getElementById('card-score-before');
+    elSb.textContent = sb + '%';
+    elSb.className = 'card-value ' + scoreColor(sb);
+
+    const elSa = document.getElementById('card-score-after');
+    elSa.textContent = sa + '%';
+    elSa.className = 'card-value ' + scoreColor(sa);
+
+    document.getElementById('card-rows').textContent = r.rows_after + ' / ' + r.rows_before;
+    document.getElementById('card-cols').textContent = Object.keys(r.columns).length;
+
+    // Changes
+    const changesList = document.getElementById('changes-list');
+    changesList.innerHTML = '';
+    (r.changes || []).forEach(c => {
+      const li = document.createElement('li');
+      li.textContent = c;
+      changesList.appendChild(li);
+    });
+    if (!r.changes || !r.changes.length) {
+      const li = document.createElement('li');
+      li.textContent = 'Aucune transformation appliquée.';
+      changesList.appendChild(li);
+    }
+
+    // Column table
+    const tbody = document.getElementById('col-table-body');
+    tbody.innerHTML = '';
+    Object.entries(r.columns).forEach(([col, info]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${col}</strong></td>
+        <td><span class="tag">${info.type}</span></td>
+        <td>${scoreBar(info.score_before)}</td>
+        <td>${scoreBar(info.score_after)}</td>
+        <td>—</td>
+        <td>—</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Preview
+    if (previewData && previewData.preview && previewData.preview.length) {
+      const cols = Object.keys(previewData.preview[0]);
+      let html = '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+      previewData.preview.forEach(row => {
+        html += '<tr>' + cols.map(c => `<td>${row[c] ?? ''}</td>`).join('') + '</tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('preview-wrap').innerHTML = html;
+    }
+
+    showSection('dashboard');
+  }
+
+  // ── download ─────────────────────────────────────────────────────────────────
+  async function download(fmt) {
+    if (!sessionId) return;
+    const res = await fetch(`/api/download/${fmt}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    if (!res.ok) { alert('Erreur lors du téléchargement.'); return; }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const nameMatch = disposition.match(/filename="?([^"]+)"?/);
+    const filename = nameMatch ? nameMatch[1] : `qualidata.${fmt === 'excel' ? 'xlsx' : 'csv'}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── reset ─────────────────────────────────────────────────────────────────────
+  function reset() {
+    sessionId = null;
+    previewData = null;
+    analysisResult = null;
+    document.getElementById('file-info-bar').classList.remove('visible');
+    document.getElementById('file-input').value = '';
+    showSection('upload-section');
+  }
+</script>
+</body>
+</html>
